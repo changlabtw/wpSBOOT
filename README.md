@@ -38,7 +38,8 @@ How to concatenate:
 	output: superMSA.phylip
 ```
     
-### web server @ https://wpsboot.page.link/main
+## web server
+https://wpsboot.page.link/main
 
 ## reference
 * original paper: J.-M. Chang, E. W. Floden, J. Herrero, O. Gascuel, P. Di Tommaso, and C. Notredame, <a href="https://doi.org/10.1093/bioinformatics/btz082">Incorporating alignment uncertainty into Felsenstein’s phylogenetic bootstrap to improve its reliability</a>. *Bioinformatics*, Feb. 2019
