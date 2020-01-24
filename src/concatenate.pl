@@ -129,9 +129,9 @@ sub usage
 sub parse_options
 {
 	#no input options
-	if((!@ARGV) or	!GetOptions('help|?'=>\$help,'intersect'=>\$intersect,'random'=>\$random,'size=i'=>\$size,'replicate=i'=>\$replicate,'aln=s{1,20}'=>\@files,'out=s'=
->\$output) 
-	or defined $help 
+	if ((!@ARGV)
+	or	!GetOptions('help|?'=>\$help,'intersect'=>\$intersect,'random'=>\$random,'size=i'=>\$size,'replicate=i'=>\$replicate,'aln=s{1,20}'=>\@files,'out=s'=>\$output) 
+	or defined $help
 	or ($#ARGV ne -1)) #after parse options, there are remaining options
 	{
 		usage();
