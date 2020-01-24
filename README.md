@@ -2,7 +2,7 @@
 weighted partial super bootstrap
 
 ## src/concatenate.pl
-Union concatenate alignments according to inputting order into a Super-MSA
+Union concatenate alignments according to inputting order into a Super-MSA with **PHYLIP** format.
 
 ### requirement
 Please install the following modules from BioPerl. Detailed information in <a href="https://bioperl.org/index.html">BioPerl</a>.
@@ -15,9 +15,9 @@ Please install the following modules from BioPerl. Detailed information in <a hr
 cpan> install Bio::AlignIO
 ```
 
-### Usage
+### usage
 ```bash
-concatenate.pl [options] --aln alignment1 alignment2 ... (at least two alignments) --out file
+concatenate.pl [options] --aln alignment1 alignment2 ... (at least two alignments) --out result
 	--intersect: only concatenate sequences appearing in all alignments, otherwise missing sequence is replaced with gap (default)
 	--random: concatenate order is random
 	--size N: only concatenate first N alignments from inputting, exclusive with replicate mode
@@ -26,13 +26,16 @@ concatenate.pl [options] --aln alignment1 alignment2 ... (at least two alignment
 
 ### example commend
 ```bash
-../bin/concatanate.pl --aln Dmel_56.phylip_aln Dana_34.phylip_aln Dere_43.phylip_aln
+perl concatenate.pl --aln MAFFT.fasta Muscle.fasta ClustalW.fasta T-Coffee.fasta --out superMSA.phylip
+
 How to concatenate:
-	size: 3 alignments
+	size: 4 alignments
 	alignments:
-		Dmel_56.phylip_aln
-		Dana_34.phylip_aln
-		Dere_43.phylip_aln
+		MAFFT.fasta
+		Muscle.fasta
+		ClustalW.fasta
+		T-Coffee.fasta
+	output: superMSA.phylip
 ```
     
 ### web server @ https://wpsboot.page.link/main
