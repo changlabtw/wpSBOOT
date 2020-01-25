@@ -27,7 +27,9 @@ concatenate.pl [options] --aln alignment1 alignment2 ... (at least two alignment
 ### an example commend
 ```bash
 perl concatenate.pl --aln MAFFT.fasta Muscle.fasta ClustalW.fasta T-Coffee.fasta --out superMSA.phylip
-
+```
+corresponding running log
+```bash
 How to concatenate:
 	size: 4 alignments
 	alignments:
