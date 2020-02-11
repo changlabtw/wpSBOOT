@@ -2,16 +2,16 @@ folder list files for constructing web
 
 ```
 wpSBOOT ( web )
-|   
-└───  src ( script files using in app.py )
-|   
-└───  templates ( html )
-|   
-└───  static ( static data )
-        |   
-        └───  uploads ( alignment input )
-        |
-        └───  UserData ( concatenated results )
+    |   
+    └───  src ( script files using in app.py )
+    |   
+    └───  templates ( html )
+    |   
+    └───  static ( static data )
+            |   
+            └───  uploads ( alignment input )
+            |
+            └───  UserData ( concatenated results )
 ```
 
 Enviroment configure :  pip install -r requirements.txt
