@@ -216,4 +216,19 @@ wpSBOOT/
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+GPL3 License. See [LICENSE](LICENSE) for details.
+
+---
+
+## Web Server
+
+https://wpsboot.page.link/main
+
+---
+
+## References
+
+- Chang J-M, Floden EW, Herrero J, Gascuel O, Di Tommaso P, Notredame C (2019) [Incorporating alignment uncertainty into Felsenstein’s phylogenetic bootstrap to improve its reliability](https://doi.org/10.1093/bioinformatics/btz082). *Bioinformatics* 35:4386–4388
+- Ashkenazy H, Sela I, Levy Karin E, Landan G, Pupko T (2019) [Multiple sequence alignment averaging improves phylogeny reconstruction](https://doi.org/10.1093/sysbio/syy036). *Systematic Biology* 68:117–130
+- Notredame C, et al. (2000) T-Coffee: A novel method for fast and accurate multiple sequence alignment. *J Mol Biol* 302:205–217
+- Kozlov AM, et al. (2019) RAxML-NG: A fast, scalable and user-friendly tool for maximum likelihood phylogenetic inference. *Bioinformatics* 35:4453–4455
