@@ -1,0 +1,20 @@
+# External tool binaries (install separately; see README)
+bin/t_coffee
+bin/raxml-ng
+
+# Compiled wei_seqboot binary (built from src/ via make)
+bin/wei_seqboot
+
+# Compiled object files
+src/*.o
+
+# Pipeline output directories
+results/
+test_output/
+
+# macOS
+.DS_Store
+
+# Editor
+*.swp
+*~
