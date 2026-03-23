@@ -1,9 +1,12 @@
-# External tool binaries (install separately; see README)
+# External tool binaries (install via setup.sh; see README)
 bin/t_coffee
 bin/raxml-ng
 
-# Compiled wei_seqboot binary (built from src/ via make)
+# Compiled wei_seqboot binary (built from src/ via setup.sh or make)
 bin/wei_seqboot
+
+# Keep the bin/ directory in the repo
+!bin/.gitkeep
 
 # Compiled object files
 src/*.o
