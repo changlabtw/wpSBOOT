@@ -83,6 +83,15 @@ for f in "${INPUT_FILES[@]}"; do
     [[ ! -f "$f" ]] && error "Input file not found: $f"
 done
 
+# --- Convert all paths to absolute so that step scripts can cd freely ---
+# INPUT_FILES: resolve each to absolute path
+for i in "${!INPUT_FILES[@]}"; do
+    INPUT_FILES[$i]="$(cd "$(dirname "${INPUT_FILES[$i]}")" && pwd)/$(basename "${INPUT_FILES[$i]}")"
+done
+# OUTPUT_DIR: create first, then resolve
+mkdir -p "$OUTPUT_DIR"
+OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
+
 # --- Compute N-dependent defaults ---
 N=${#INPUT_FILES[@]}
 
