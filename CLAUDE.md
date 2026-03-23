@@ -4,82 +4,119 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-wpSBOOT (Weighted Partial Super Bootstrap) is a bioinformatics protocol for phylogenetic support assessment. This repository contains shell scripts for a Methods in Molecular Biology chapter.
+wpSBOOT (Weighted Partial Super Bootstrap) is a bioinformatics protocol for phylogenetic support assessment. It takes multiple sequence alignments produced by different alignment tools (e.g., ClustalW, MAFFT, Muscle), builds a weighted super-MSA, and generates bootstrap support values using weighted partial resampling. Published at https://github.com/changlabtw/wpSBOOT.
 
 ## Commands
 
 ```bash
-# Run wpSBOOT analysis (basic)
-./scripts/wpsboot.sh -i <alignment.fasta> -o <output_dir>
+# Run wpSBOOT with multiple alignments
+./scripts/wpsboot.sh -i aln1.fasta -i aln2.fasta -i aln3.fasta -o output_dir/
 
-# Run with RAxML-NG instead of IQ-TREE2
-./scripts/wpsboot.sh -i <alignment.fasta> -o <output_dir> -t raxml-ng
+# Run with custom bootstrap replicates and threads
+./scripts/wpsboot.sh -i aln1.fasta -i aln2.fasta -o output_dir/ -n 500 -T 8
 
-# Run with partitions
-./scripts/wpsboot.sh -i <alignment.fasta> -o <output_dir> -p <partitions.txt>
+# Run with custom partial fraction and model
+./scripts/wpsboot.sh -i aln1.fasta -i aln2.fasta -o output_dir/ -p 0.5 -m GTR+G
 
-# Test with example data
-./scripts/wpsboot.sh -i data/example/example_alignment.fasta -o results/test
+# Quick test (10 replicates, uses example/alignments/ YPL070W data)
+./test.sh
 
-# Run pipeline test (no external tools required)
-./scripts/test_pipeline.sh
+# Full test (default N x 100 replicates)
+./test.sh --full
+
+# Compile wei_seqboot from source
+cd src/ && make && cd ..
 ```
 
 ## Architecture
 
-The protocol follows a three-step pipeline executed by `scripts/wpsboot.sh`:
+The pipeline is executed by `scripts/wpsboot.sh`, which sources six step scripts in order. All scripts share variables via the sourcing shell — no subshells are used between steps.
 
-1. **step1_generate_samples.sh** - Generates weighted partial bootstrap resampled alignments
-   - Parses FASTA/PHYLIP alignments
-   - Calculates site weights (uniform or entropy-based)
-   - Performs weighted sampling without replacement to select partial sites
-   - Applies bootstrap resampling with replacement on selected sites
-   - Outputs PHYLIP-format samples to `bootstrap_samples/`
-2. **step2_run_inference.sh** - Runs phylogenetic inference on each sample
-   - Infers ML tree from original alignment
-   - Processes each bootstrap sample individually (supports GNU parallel)
-   - Extracts model from ML inference if AUTO was used
-   - Collects all bootstrap trees into single file
-3. **step3_aggregate_support.sh** - Maps bootstrap support onto the ML tree
-   - Uses IQ-TREE2 or RAxML-NG support mapping
-   - Generates summary statistics
+1. **step1_similarity.sh** — Pairwise alignment similarity via T-Coffee
+   - Runs `t_coffee -other_pg aln_compare -compare_mode column` for all pairs (i≠j)
+   - Computes per-alignment average similarity
+   - Weight = `100 - avg_similarity` (less similar = more unique signal = higher weight)
+   - Outputs `01_similarity/similarity.csv`; sets `ALN_WEIGHTS` array
 
-Each step script is sourced by the main wrapper and inherits variables from it.
+2. **step2_superMSA.sh** — Build weighted super-MSA
+   - Concatenates all input FASTAs into a single PHYLIP file using `concatenate.pl` (BioPerl)
+   - Generates `site_weights.txt`: one weight per site, inherited from its source alignment
+   - Outputs `02_superMSA/super_aln.phylip` and `02_superMSA/site_weights.txt`
+   - Exports `SUPER_PHY` and `SITE_WEIGHTS`
 
-### Weighted Partial Sampling Algorithm
+3. **step3_bootstrap.sh** — Weighted partial bootstrap sampling
+   - Calls `wei_seqboot -n $BOOTSTRAP_REPS -p $PARTIAL_FRACTION $SUPER_PHY $SITE_WEIGHTS`
+   - Sites sampled with probability proportional to weight; partial fraction = 1/N by default
+   - Output written to `03_bootstrap/outfile` (all replicates concatenated in PHYLIP format)
+   - Exports `BOOT_FILE`
 
-The wpSBOOT method combines two sampling strategies:
-1. **Weighted partial selection**: Sites are selected without replacement using weighted reservoir sampling (priority = random^(1/weight))
-2. **Bootstrap resampling**: Selected sites are resampled with replacement
+4. **step4_ml_tree.sh** — ML tree inference
+   - Runs `raxml-ng` on the super-MSA to produce the reference ML tree
+   - Outputs `04_ml_tree/ml_tree.raxml.bestTree`
+   - Exports `ML_TREE`
 
-Weighting schemes:
-- `uniform`: All sites have equal probability
-- `entropy`: Variable sites (higher Shannon entropy) have higher probability
+5. **step5_boot_trees.sh** — Bootstrap tree inference
+   - Splits `BOOT_FILE` into individual PHYLIP files (one per replicate)
+   - Runs `raxml-ng` on each replicate in parallel (up to `$THREADS` jobs)
+   - Collects all bootstrap trees into `05_boot_trees/bootstrap_trees.nwk`
+   - Exports `BOOT_TREES`
+
+6. **step6_support.sh** — Map bootstrap support
+   - Runs `raxml-ng --support` to map bootstrap values onto the ML tree
+   - Copies final result to `$OUTPUT_DIR/wpSBOOT_result.nwk`
 
 ## Project Structure
 
-- `scripts/` - Shell scripts implementing the protocol
-- `data/example/` - Example alignment and partition files for testing
-- `config/` - Configuration templates
-- `results/` - Output directory (created during analysis)
+```
+wpSBOOT/
+├── bin/                  ← executables: t_coffee, raxml-ng, wei_seqboot
+├── scripts/
+│   ├── wpsboot.sh        ← main wrapper
+│   ├── step1–6_*.sh      ← pipeline steps (sourced by wpsboot.sh)
+│   └── concatenate.pl    ← BioPerl alignment concatenation
+├── src/                  ← wei_seqboot C++ source (main.cpp, element.cpp, makefile)
+├── example/
+│   └── alignments/       ← 7 YPL070W FASTA alignments (example/test data)
+├── web/                  ← Flask web server (separate from CLI pipeline)
+├── test.sh               ← user-facing test script
+└── README.md
+```
 
 ## Key Variables
 
-The main script (`wpsboot.sh`) sets these variables used by step scripts:
-- `$INPUT` - Input alignment path
-- `$OUTPUT_DIR` - Output directory path
-- `$TOOL` - Phylogenetic tool (iqtree2 or raxml-ng)
-- `$BOOTSTRAP_REPS` - Number of bootstrap replicates
-- `$WEIGHTING_SCHEME` - Site weighting scheme (uniform, entropy)
-- `$PARTIAL_FRACTION` - Fraction of sites for partial sampling (0.0-1.0)
-- `$MODEL` - Substitution model
-- `$THREADS` - Parallel threads
-- `$PARTITIONS` - Optional partition file path
-- `$WEIGHTS_FILE` - Optional user-provided weights file
+All variables are set in `wpsboot.sh` and inherited by sourced step scripts:
+
+| Variable | Description | Default |
+|---|---|---|
+| `INPUT_FILES` | Array of input FASTA alignment paths | required |
+| `N` | Number of input alignments | derived |
+| `OUTPUT_DIR` | Output directory path | required |
+| `BOOTSTRAP_REPS` | Number of bootstrap replicates | N × 100 |
+| `PARTIAL_FRACTION` | Fraction of super-MSA sites per replicate | 1/N |
+| `MODEL` | RAxML-NG substitution model | GTR+G |
+| `THREADS` | Parallel threads | 4 |
+| `BIN_DIR` | Path to executables | `../bin/` |
+
+Step scripts export these variables for downstream steps:
+
+| Variable | Set by | Used by |
+|---|---|---|
+| `ALN_WEIGHTS` | step1 | step2 |
+| `SUPER_PHY`, `SITE_WEIGHTS` | step2 | step3, step4 |
+| `BOOT_FILE` | step3 | step5 |
+| `ML_TREE` | step4 | step6 |
+| `BOOT_TREES` | step5 | step6 |
 
 ## External Tool Dependencies
 
-- **IQ-TREE2** (≥2.2.0) - Primary phylogenetic inference tool
-- **RAxML-NG** (≥1.1.0) - Alternative phylogenetic inference tool
+- **t_coffee** (≥13.0) — alignment similarity; binary in `bin/` or PATH
+- **raxml-ng** (≥1.0) — ML and bootstrap tree inference; binary in `bin/` or PATH
+- **Perl + BioPerl** — required by `concatenate.pl` (`Bio::AlignIO`, `Bio::Align::Utilities`, `Bio::LocatableSeq`)
+- **wei_seqboot** — compiled from `src/` using `make`
 
-Both tools must be in PATH for the scripts to work.
+## Reference Data for Validation
+
+Pre-computed reference outputs for YPL070W (7 alignments) are in `202603_originalCode/pre_results/`:
+- `concatenateAln_YPL070W.phylip` — expected super-MSA
+- `YPL070W.wei` — expected site weights
+- `YPL070W.tre` — reference ML tree
