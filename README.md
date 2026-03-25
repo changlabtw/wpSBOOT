@@ -28,6 +28,7 @@ This propagates alignment uncertainty into bootstrap support, providing a more r
 | Perl | ≥ 5.26 | Run `concatenate.pl` |
 | [BioPerl](https://bioperl.org) | ≥ 1.7 | Required by `concatenate.pl` (Bio::AlignIO) |
 | wei_seqboot | (included) | Weighted partial bootstrap sampling |
+| Python | ≥ 3.6 | Run `support_summary.py` (standard library only) |
 
 `t_coffee` and `raxml-ng` binaries are expected in `bin/`, or available in `PATH`. `wei_seqboot` is compiled from the included C++ source.
 
@@ -101,20 +102,36 @@ All checks should pass before running on real data.
 
 ---
 
-## Example — YPL070W
+## Examples
 
-Seven alignments of the yeast gene YPL070W, produced by seven different alignment tools, are included in `example/alignments/`.
+Two yeast gene families are included in `example/`, each with seven alignments produced by different alignment tools.
+
+### YPL070W
 
 ```bash
 ./scripts/wpsboot.sh \
-    -i example/alignments/clustalw_YPL070W.fasta \
-    -i example/alignments/DCA_YPL070W.fasta \
-    -i example/alignments/dialign_YPL070W.fasta \
-    -i example/alignments/mafft_YPL070W.fasta \
-    -i example/alignments/muscle_YPL070W.fasta \
-    -i example/alignments/probcons_YPL070W.fasta \
-    -i example/alignments/tcoffee_YPL070W.fasta \
+    -i example/YPL070W/clustalw_YPL070W.fasta \
+    -i example/YPL070W/DCA_YPL070W.fasta \
+    -i example/YPL070W/dialign_YPL070W.fasta \
+    -i example/YPL070W/mafft_YPL070W.fasta \
+    -i example/YPL070W/muscle_YPL070W.fasta \
+    -i example/YPL070W/probcons_YPL070W.fasta \
+    -i example/YPL070W/tcoffee_YPL070W.fasta \
     -o results/YPL070W
+```
+
+### YDR192C
+
+```bash
+./scripts/wpsboot.sh \
+    -i example/YDR192C/clustalw_YDR192C.fasta \
+    -i example/YDR192C/DCR_YDR192C.fasta \
+    -i example/YDR192C/dialign_YDR192C.fasta \
+    -i example/YDR192C/mafft_YDR192C.fasta \
+    -i example/YDR192C/muscle_YDR192C.fasta \
+    -i example/YDR192C/probcons_YDR192C.fasta \
+    -i example/YDR192C/tcoffee_YDR192C.fasta \
+    -o results/YDR192C
 ```
 
 With 7 alignments the defaults resolve to:
@@ -124,8 +141,12 @@ With 7 alignments the defaults resolve to:
 Or run via the test script:
 
 ```bash
-./test.sh           # quick test (10 replicates)
-./test.sh --full    # full run  (default N × 100 replicates)
+./test.sh                        # quick test, YPL070W (default)
+./test.sh --full                 # full test,  YPL070W
+./test.sh --gene YDR192C         # quick test, YDR192C
+./test.sh --gene YDR192C --full  # full test,  YDR192C
+./test.sh --gene all             # quick test, both genes
+./test.sh --gene all --full      # full test,  both genes
 ```
 
 ---
@@ -156,6 +177,27 @@ Intermediate files are organised by pipeline step:
 └── 06_support/
     └── support.raxml.support      ← support tree (also copied to wpSBOOT_result.nwk)
 ```
+
+### Support summary
+
+A helper script `scripts/support_summary.py` reports per-node and whole-tree bootstrap support:
+
+```bash
+# Per-node summary + tree topology
+python3 scripts/support_summary.py <output_dir>/wpSBOOT_result.nwk
+
+# Also compute whole-tree topology support
+python3 scripts/support_summary.py <output_dir>/wpSBOOT_result.nwk \
+    <output_dir>/05_boot_trees/bootstrap_trees.nwk
+
+# Verbose: print each bootstrap tree and its match status
+python3 scripts/support_summary.py <output_dir>/wpSBOOT_result.nwk \
+    <output_dir>/05_boot_trees/bootstrap_trees.nwk --verbose
+```
+
+**Per-node support** (from `wpSBOOT_result.nwk`): the fraction of bootstrap trees containing each bipartition, as mapped by RAxML-NG.
+
+**Whole-tree topology support**: the fraction of bootstrap trees whose unrooted topology is identical to the ML reference tree (all bipartitions match simultaneously). This is a stricter measure than per-node support — a tree is counted only if every internal branch matches.
 
 ---
 
@@ -188,20 +230,22 @@ All N input alignments are concatenated in order into a single PHYLIP-format sup
 
 ```
 wpSBOOT/
-├── bin/                   ← executables (t_coffee, raxml-ng, wei_seqboot)
+├── bin/                      ← executables (t_coffee, raxml-ng, wei_seqboot)
 ├── scripts/
-│   ├── wpsboot.sh         ← main pipeline wrapper
+│   ├── wpsboot.sh            ← main pipeline wrapper
 │   ├── step1_similarity.sh
 │   ├── step2_superMSA.sh
 │   ├── step3_bootstrap.sh
 │   ├── step4_ml_tree.sh
 │   ├── step5_boot_trees.sh
 │   ├── step6_support.sh
-│   └── concatenate.pl     ← BioPerl alignment concatenation
-├── src/                   ← wei_seqboot C++ source (main.cpp, element.cpp, makefile)
+│   ├── concatenate.pl        ← BioPerl alignment concatenation
+│   └── support_summary.py    ← bootstrap support summary (per-node + whole-tree)
+├── src/                      ← wei_seqboot C++ source (main.cpp, element.cpp, makefile)
 ├── example/
-│   └── alignments/        ← 7 FASTA alignments for YPL070W
-├── test.sh                ← test script
+│   ├── YPL070W/              ← 7 FASTA alignments for YPL070W
+│   └── YDR192C/              ← 7 FASTA alignments for YDR192C
+├── test.sh                   ← test script (supports --gene, --full)
 └── LICENSE
 ```
 
@@ -215,7 +259,9 @@ GPL3 License. See [LICENSE](LICENSE) for details.
 
 ## Web Server
 
-https://wpsboot.page.link/main
+> **Note:** The web server is currently unavailable. Please use the command-line interface described above.
+
+~~https://wpsboot.page.link/main~~
 
 ---
 

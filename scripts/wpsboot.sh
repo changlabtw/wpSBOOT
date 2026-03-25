@@ -40,18 +40,29 @@ Usage: $(basename "$0") -i <aln1.fasta> -i <aln2.fasta> [...] -o <output_dir> [o
 
 Required:
   -i <file>    Input alignment (FASTA); specify once per alignment (min. 2)
-  -o <dir>     Output directory
+  -o <dir>     Output directory (created if it does not exist)
 
 Options:
-  -n <int>     Bootstrap replicates (default: N_alignments x 100)
-  -p <float>   Partial sampling fraction 0.0-1.0 (default: 1/N_alignments)
+  -n <int>     Bootstrap replicates (default: N x 100, where N = number of alignments)
+  -p <float>   Partial sampling fraction 0.0-1.0 (default: 1/N)
   -m <model>   Substitution model for raxml-ng (default: GTR+G)
   -T <int>     Threads (default: 4)
-  -h           Show this help
+  -h           Show this help and exit
 
-Example:
+Pipeline steps and output folders:
+  Step 1  Pairwise alignment similarity (t_coffee)   -> <output_dir>/01_similarity/
+  Step 2  Weighted super-MSA (concatenate.pl)        -> <output_dir>/02_superMSA/
+  Step 3  Weighted partial bootstrap (wei_seqboot)   -> <output_dir>/03_bootstrap/
+  Step 4  ML tree inference (raxml-ng)               -> <output_dir>/04_ml_tree/
+  Step 5  Bootstrap tree inference (raxml-ng)        -> <output_dir>/05_boot_trees/
+  Step 6  Map bootstrap support (raxml-ng)           -> <output_dir>/06_support/
+
+Final result:
+  <output_dir>/wpSBOOT_result.nwk   ML tree with bootstrap support values
+
+Examples:
   $(basename "$0") -i clustalw.fasta -i mafft.fasta -i muscle.fasta -o results/
-  $(basename "$0") -i example/alignments/*.fasta -o results/ -n 1000
+  $(basename "$0") -i example/YPL070W/*.fasta -o results/YPL070W -n 1000 -T 8
 
 EOF
     exit 0
@@ -119,11 +130,18 @@ export BIN_DIR MODEL THREADS BOOTSTRAP_REPS PARTIAL_FRACTION N OUTPUT_DIR SCRIPT
 # --- Execute pipeline steps ---
 # Each step script is sourced so it inherits all variables (INPUT_FILES array,
 # and any variables exported by earlier steps such as SUPER_PHY, SITE_WEIGHTS, etc.)
+TIME_START=$(date +%s)
 source "$SCRIPT_DIR/step1_similarity.sh"
 source "$SCRIPT_DIR/step2_superMSA.sh"
 source "$SCRIPT_DIR/step3_bootstrap.sh"
 source "$SCRIPT_DIR/step4_ml_tree.sh"
 source "$SCRIPT_DIR/step5_boot_trees.sh"
 source "$SCRIPT_DIR/step6_support.sh"
+TIME_END=$(date +%s)
+
+ELAPSED=$(( TIME_END - TIME_START ))
+ELAPSED_MIN=$(( ELAPSED / 60 ))
+ELAPSED_SEC=$(( ELAPSED % 60 ))
 
 log "=== Done. Final result: $OUTPUT_DIR/wpSBOOT_result.nwk ==="
+log "=== Total runtime: ${ELAPSED_MIN}m ${ELAPSED_SEC}s ==="

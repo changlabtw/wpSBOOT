@@ -18,11 +18,26 @@ wpSBOOT (Weighted Partial Super Bootstrap) is a bioinformatics protocol for phyl
 # Run with custom partial fraction and model
 ./scripts/wpsboot.sh -i aln1.fasta -i aln2.fasta -o output_dir/ -p 0.5 -m GTR+G
 
-# Quick test (10 replicates, uses example/alignments/ YPL070W data)
+# Quick test (10 replicates) — YPL070W by default
 ./test.sh
 
 # Full test (default N x 100 replicates)
 ./test.sh --full
+
+# Test a specific gene or both genes
+./test.sh --gene YDR192C
+./test.sh --gene all --full
+
+# Bootstrap support summary (per-node + tree topology)
+python3 scripts/support_summary.py <output_dir>/wpSBOOT_result.nwk
+
+# Also compute whole-tree topology support
+python3 scripts/support_summary.py <output_dir>/wpSBOOT_result.nwk \
+    <output_dir>/05_boot_trees/bootstrap_trees.nwk
+
+# Print match/diff detail for each bootstrap replicate
+python3 scripts/support_summary.py <output_dir>/wpSBOOT_result.nwk \
+    <output_dir>/05_boot_trees/bootstrap_trees.nwk --verbose
 
 # Compile wei_seqboot from source
 cd src/ && make && cd ..
@@ -73,14 +88,35 @@ wpSBOOT/
 ├── scripts/
 │   ├── wpsboot.sh        ← main wrapper
 │   ├── step1–6_*.sh      ← pipeline steps (sourced by wpsboot.sh)
-│   └── concatenate.pl    ← BioPerl alignment concatenation
+│   ├── concatenate.pl    ← BioPerl alignment concatenation
+│   └── support_summary.py ← bootstrap support summary (per-node + whole-tree)
 ├── src/                  ← wei_seqboot C++ source (main.cpp, element.cpp, makefile)
 ├── example/
-│   └── alignments/       ← 7 YPL070W FASTA alignments (example/test data)
+│   ├── YPL070W/          ← 7 FASTA alignments for YPL070W
+│   └── YDR192C/          ← 7 FASTA alignments for YDR192C
 ├── web/                  ← Flask web server (separate from CLI pipeline)
-├── test.sh               ← user-facing test script
+├── test.sh               ← user-facing test script (supports --gene, --full)
 └── README.md
 ```
+
+## support_summary.py
+
+Reports bootstrap support for a wpSBOOT result tree.
+
+```bash
+# Per-node summary + ASCII tree topology
+python3 scripts/support_summary.py <result.nwk>
+
+# Also compute whole-tree topology support
+python3 scripts/support_summary.py <result.nwk> <bootstrap_trees.nwk>
+
+# Verbose: print each bootstrap tree and match/diff status
+python3 scripts/support_summary.py <result.nwk> <bootstrap_trees.nwk> --verbose
+```
+
+**Per-node support**: fraction of bootstrap trees containing each bipartition (from RAxML-NG `--support`). Reports mean, median, min, max, and count of fully-supported nodes.
+
+**Whole-tree topology support**: fraction of bootstrap trees whose unrooted topology is identical to the ML reference tree (all bipartitions match simultaneously). Stricter than per-node support — a replicate is counted only if every internal branch matches.
 
 ## Key Variables
 
