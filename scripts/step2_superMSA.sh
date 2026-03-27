@@ -21,10 +21,17 @@
 SUPER_DIR="$OUTPUT_DIR/02_superMSA"
 mkdir -p "$SUPER_DIR"
 
-log "Step 2: Building weighted super-MSA..."
-
 SUPER_PHY="$SUPER_DIR/super_aln.phylip"
 SITE_WEIGHTS="$SUPER_DIR/site_weights.txt"
+
+# --- Skip if already complete ---
+if [[ "${FORCE:-0}" -eq 0 && -s "$SUPER_PHY" && -s "$SITE_WEIGHTS" ]]; then
+    log_stdout "Step 2: Skipping (output exists: $SUPER_PHY)"
+    export SUPER_PHY SITE_WEIGHTS
+    return 0
+fi
+
+log_stdout "Step 2: Building weighted super-MSA..."
 
 # --- Concatenate alignments using concatenate.pl ---
 # concatenate.pl --aln takes all input FASTA files in the given order

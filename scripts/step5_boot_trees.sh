@@ -17,7 +17,16 @@
 BOOT_TREE_DIR="$OUTPUT_DIR/05_boot_trees"
 mkdir -p "$BOOT_TREE_DIR"
 
-log "Step 5: Inferring $BOOTSTRAP_REPS bootstrap trees..."
+BOOT_TREES="$BOOT_TREE_DIR/bootstrap_trees.nwk"
+
+# --- Skip if already complete ---
+if [[ "${FORCE:-0}" -eq 0 && -s "$BOOT_TREES" ]]; then
+    log_stdout "Step 5: Skipping (output exists: $BOOT_TREES)"
+    export BOOT_TREES
+    return 0
+fi
+
+log_stdout "Step 5: Inferring $BOOTSTRAP_REPS bootstrap trees..."
 
 # --- Split the wei_seqboot outfile into individual PHYLIP files ---
 # wei_seqboot writes replicates sequentially; each starts with a PHYLIP
@@ -39,7 +48,6 @@ awk -v out_dir="$BOOT_TREE_DIR" '
 # --- Infer bootstrap tree for each replicate ---
 # Run up to THREADS raxml-ng jobs in parallel using a simple background-job pool
 
-BOOT_TREES="$BOOT_TREE_DIR/bootstrap_trees.nwk"
 > "$BOOT_TREES"   # initialise (will be appended to sequentially after parallel runs)
 
 # Function: infer tree for one replicate; called in a subshell via &
@@ -63,6 +71,10 @@ infer_boot_tree() {
 }
 export -f infer_boot_tree
 
+# Progress interval: report at every 25% (minimum every 1 rep)
+PROGRESS_INTERVAL=$(( BOOTSTRAP_REPS / 4 ))
+[[ "$PROGRESS_INTERVAL" -lt 1 ]] && PROGRESS_INTERVAL=1
+
 # Run in parallel, THREADS jobs at a time
 job_count=0
 for ((rep=1; rep<=BOOTSTRAP_REPS; rep++)); do
@@ -75,14 +87,14 @@ for ((rep=1; rep<=BOOTSTRAP_REPS; rep++)); do
         job_count=0
     fi
 
-    # Progress report every 50 replicates
-    if [[ $((rep % 50)) -eq 0 ]]; then
-        log "  Launched bootstrap tree jobs: $rep / $BOOTSTRAP_REPS"
+    # Progress report at each 25% milestone
+    if [[ $((rep % PROGRESS_INTERVAL)) -eq 0 ]]; then
+        log_stdout "  Step 5: $rep / $BOOTSTRAP_REPS bootstrap tree jobs launched"
     fi
 done
 wait  # wait for any remaining background jobs
 
-log "  All bootstrap tree jobs completed"
+log_stdout "Step 5: All bootstrap tree jobs completed"
 
 # --- Collect bootstrap trees in replicate order ---
 for ((rep=1; rep<=BOOTSTRAP_REPS; rep++)); do
@@ -95,8 +107,20 @@ for ((rep=1; rep<=BOOTSTRAP_REPS; rep++)); do
 done
 
 n_trees=$(wc -l < "$BOOT_TREES" | tr -d ' ')
-log "Bootstrap trees: $BOOT_TREES ($n_trees trees collected)"
-[[ "$n_trees" -eq 0 ]] && error "No bootstrap trees were produced"
+n_missing=$(( BOOTSTRAP_REPS - n_trees ))
+log "Bootstrap trees: $BOOT_TREES ($n_trees / $BOOTSTRAP_REPS collected)"
+
+if [[ "$n_trees" -eq 0 ]]; then
+    error "No bootstrap trees were produced"
+elif [[ "$n_missing" -gt 0 ]]; then
+    error "$n_missing / $BOOTSTRAP_REPS bootstrap trees missing — check raxml-ng logs in $BOOT_TREE_DIR"
+fi
+
+# --- Clean up intermediate per-replicate files ---
+if [[ "${KEEP_INTERMEDIATES:-0}" -eq 0 ]]; then
+    rm -f "$BOOT_TREE_DIR"/boot_*.phy "$BOOT_TREE_DIR"/boot_tree_*.*
+    log "Intermediate bootstrap files removed (use -k to keep)"
+fi
 
 # Export path for downstream steps
 export BOOT_TREES

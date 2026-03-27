@@ -21,22 +21,45 @@
 BOOT_DIR="$OUTPUT_DIR/03_bootstrap"
 mkdir -p "$BOOT_DIR"
 
-log "Step 3: Generating $BOOTSTRAP_REPS bootstrap samples (partial fraction=$PARTIAL_FRACTION)..."
+BOOT_FILE="$BOOT_DIR/outfile"
+
+# --- Skip if already complete ---
+if [[ "${FORCE:-0}" -eq 0 && -s "$BOOT_FILE" ]]; then
+    log_stdout "Step 3: Skipping (output exists: $BOOT_FILE)"
+    export BOOT_FILE
+    return 0
+fi
+
+log_stdout "Step 3: Generating $BOOTSTRAP_REPS bootstrap samples (partial fraction=$PARTIAL_FRACTION)..."
 
 # wei_seqboot always writes output to a file named "outfile" in the current
 # working directory, so we change into the bootstrap directory first
 cd "$BOOT_DIR"
 
-"$BIN_DIR/wei_seqboot" \
-    -n "$BOOTSTRAP_REPS" \
-    -p "$PARTIAL_FRACTION" \
-    "$SUPER_PHY" \
-    "$SITE_WEIGHTS"
+if [[ -n "${SEED:-}" ]]; then
+    "$BIN_DIR/wei_seqboot" \
+        -n "$BOOTSTRAP_REPS" \
+        -p "$PARTIAL_FRACTION" \
+        -d "$SEED" \
+        "$SUPER_PHY" \
+        "$SITE_WEIGHTS"
+else
+    "$BIN_DIR/wei_seqboot" \
+        -n "$BOOTSTRAP_REPS" \
+        -p "$PARTIAL_FRACTION" \
+        "$SUPER_PHY" \
+        "$SITE_WEIGHTS"
+fi
 
-BOOT_FILE="$BOOT_DIR/outfile"
 [[ ! -f "$BOOT_FILE" ]] && error "wei_seqboot failed: outfile not found in $BOOT_DIR"
 
-log "Bootstrap samples: $BOOT_FILE"
+# Verify replicate count matches expectation
+n_replicates=$(awk '/^[[:space:]]+[0-9]+[[:space:]]+[0-9]+[[:space:]]*$/{count++} END{print count+0}' "$BOOT_FILE")
+if [[ "$n_replicates" -ne "$BOOTSTRAP_REPS" ]]; then
+    error "Bootstrap outfile contains $n_replicates replicates, expected $BOOTSTRAP_REPS — wei_seqboot may have failed or been interrupted"
+fi
+
+log "Bootstrap samples: $BOOT_FILE ($n_replicates replicates)"
 
 # Export path for downstream steps
 export BOOT_FILE

@@ -1,0 +1,9 @@
+.git/
+test_output/
+results/
+*.log
+bin/t_coffee
+bin/raxml-ng
+bin/wei_seqboot
+src/*.o
+.DS_Store

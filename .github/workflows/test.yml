@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up conda environment
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          activate-environment: wpsboot
+          environment-file: environment.yml
+
+      - name: Compile wei_seqboot
+        shell: bash -el {0}
+        run: cd src && make && cd ..
+
+      - name: Run setup
+        shell: bash -el {0}
+        run: ./setup.sh
+
+      - name: Run test (YPL070W)
+        shell: bash -el {0}
+        run: ./test.sh --gene YPL070W
+
+      - name: Run test (YDR192C)
+        shell: bash -el {0}
+        run: ./test.sh --gene YDR192C

@@ -19,10 +19,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_DIR="$SCRIPT_DIR/bin"
 SRC_DIR="$SCRIPT_DIR/src"
 
-# --- Colours ---
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
+# --- Colours (only when stdout is a terminal) ---
+if [[ -t 1 ]]; then
+    RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
+else
+    RED=''; GREEN=''; YELLOW=''; NC=''
+fi
+WARNINGS=0
 ok()   { echo -e "${GREEN}[OK]${NC}   $*"; }
-warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $*"; WARNINGS=$((WARNINGS+1)); }
 fail() { echo -e "${RED}[FAIL]${NC} $*"; }
 
 # --- Parse optional arguments ---
@@ -145,9 +150,29 @@ else
 fi
 
 # -----------------------------------------------
-# 5. Summary
+# 5. Check Python 3
+# -----------------------------------------------
+echo ""
+echo "--- Checking Python 3 ---"
+
+PYTHON_BIN="$(command -v python3 2>/dev/null || true)"
+if [[ -z "$PYTHON_BIN" ]]; then
+    warn "python3 not found — required for support_summary.py"
+    echo "       Install from: https://www.python.org/downloads/"
+else
+    PYTHON_VER="$("$PYTHON_BIN" -c 'import sys; print(sys.version.split()[0])')"
+    ok "python3 found: $PYTHON_BIN (version $PYTHON_VER)"
+fi
+
+# -----------------------------------------------
+# 6. Summary
 # -----------------------------------------------
 echo ""
 echo "========================================"
-echo " Setup complete. Verify with: ./test.sh"
+if [[ $WARNINGS -eq 0 ]]; then
+    echo " Setup complete. Verify with: ./test.sh"
+else
+    echo -e "${YELLOW} Setup complete with $WARNINGS warning(s).${NC}"
+    echo " Resolve warnings above, then verify with: ./test.sh"
+fi
 echo "========================================"

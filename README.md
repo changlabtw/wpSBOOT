@@ -1,6 +1,8 @@
 # wpSBOOT — Weighted Partial Super Bootstrap
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/changlabtw/wpSBOOT/actions/workflows/test.yml/badge.svg)](https://github.com/changlabtw/wpSBOOT/actions/workflows/test.yml)
+[![Docker](https://img.shields.io/docker/v/changlabtw/wpsboot?label=Docker&logo=docker)](https://hub.docker.com/r/changlabtw/wpsboot)
 
 A phylogenetic support assessment protocol that takes multiple sequence alignments (produced by different alignment tools) as input, builds a weighted super-MSA, and generates bootstrap support values using weighted partial resampling.
 
@@ -35,6 +37,63 @@ This propagates alignment uncertainty into bootstrap support, providing a more r
 ---
 
 ## Installation
+
+### Option A: Docker (easiest — no dependency setup required)
+
+```bash
+# Pull the pre-built image
+docker pull changlabtw/wpsboot
+
+# Run on your data (mount the directory containing your alignments)
+docker run --rm -v /path/to/data:/data changlabtw/wpsboot \
+    -i /data/aln1.fasta -i /data/aln2.fasta -i /data/aln3.fasta \
+    -o /data/results/
+
+# Run the built-in example (output stays inside the container)
+docker run --rm changlabtw/wpsboot \
+    bash /opt/wpsboot/test.sh
+```
+
+Or build locally from source:
+
+```bash
+git clone https://github.com/changlabtw/wpSBOOT.git
+cd wpSBOOT
+docker build -t wpsboot .
+docker run --rm -v /path/to/data:/data wpsboot \
+    -i /data/aln1.fasta -i /data/aln2.fasta -o /data/results/
+```
+
+> **HPC users**: Docker images are compatible with Singularity/Apptainer without root access:
+> ```bash
+> singularity pull wpsboot.sif docker://changlabtw/wpsboot
+> singularity run -B /path/to/data:/data wpsboot.sif \
+>     -i /data/aln1.fasta -i /data/aln2.fasta -o /data/results/
+> ```
+
+---
+
+### Option B: conda (recommended)
+
+```bash
+git clone https://github.com/changlabtw/wpSBOOT.git
+cd wpSBOOT
+conda env create -f environment.yml
+conda activate wpsboot
+cd src/ && make && cd ..
+./test.sh
+```
+
+> **Coming soon:** A `conda-lock.yml` will be provided for fully reproducible installs (exact package versions pinned). Once available:
+> ```bash
+> conda install -c conda-forge conda-lock
+> conda-lock install conda-lock.yml
+> conda activate wpsboot
+> cd src/ && make && cd ..
+> ./test.sh
+> ```
+
+### Option C: manual
 
 ### 1. Clone the repository
 
@@ -98,6 +157,9 @@ All checks should pass before running on real data.
 | `-p <float>` | 1/N | Partial sampling fraction (0.0–1.0) |
 | `-m <model>` | GTR+G | Substitution model for RAxML-NG |
 | `-T <int>` | 4 | Number of threads |
+| `-s <int>` | — | Random seed for reproducible bootstrap sampling (default: time-based) |
+| `-f` | — | Force rerun of all steps, ignoring any existing outputs |
+| `-k` | — | Keep intermediate per-replicate bootstrap files (default: deleted after step 5) |
 | `-h` | — | Show help and exit |
 
 ---
@@ -105,6 +167,13 @@ All checks should pass before running on real data.
 ## Examples
 
 Two yeast gene families are included in `example/`, each with seven alignments produced by different alignment tools.
+
+Input alignments can be specified individually with `-i` or with a glob:
+
+```bash
+# Glob shorthand (requires all files in the directory to be input alignments)
+./scripts/wpsboot.sh -i "example/YPL070W/*.fasta" -o results/YPL070W
+```
 
 ### YPL070W
 
@@ -157,6 +226,7 @@ The final result is written to:
 
 ```
 <output_dir>/wpSBOOT_result.nwk    ← ML tree with bootstrap support values
+<output_dir>/wpsboot.log           ← full pipeline log
 ```
 
 Intermediate files are organised by pipeline step:
@@ -223,6 +293,18 @@ All N input alignments are concatenated in order into a single PHYLIP-format sup
 - Sites are drawn with probability proportional to their weight
 - Only a fraction (default 1/N) of all sites are selected per replicate
 - Selected sites are then resampled with replacement (standard bootstrap)
+
+### ML tree inference (Step 4)
+
+`raxml-ng` infers the maximum-likelihood tree from the full super-MSA using the specified substitution model (default: GTR+G). This serves as the reference topology onto which bootstrap support values are later mapped.
+
+### Bootstrap tree inference (Step 5)
+
+`raxml-ng` infers one ML tree per bootstrap replicate in parallel (up to `THREADS` jobs at a time). All bootstrap trees are collected into a single file for the final step.
+
+### Bootstrap support mapping (Step 6)
+
+`raxml-ng --support` compares each bootstrap tree against the ML reference tree and annotates each internal branch of the ML tree with the fraction of bootstrap replicates that contain the same bipartition. The annotated tree is written to `wpSBOOT_result.nwk`.
 
 ---
 

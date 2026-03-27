@@ -14,7 +14,16 @@
 ML_DIR="$OUTPUT_DIR/04_ml_tree"
 mkdir -p "$ML_DIR"
 
-log "Step 4: Inferring ML tree (model=$MODEL, threads=$THREADS)..."
+ML_TREE="$ML_DIR/ml_tree.raxml.bestTree"
+
+# --- Skip if already complete ---
+if [[ "${FORCE:-0}" -eq 0 && -s "$ML_TREE" ]]; then
+    log_stdout "Step 4: Skipping (output exists: $ML_TREE)"
+    export ML_TREE
+    return 0
+fi
+
+log_stdout "Step 4: Inferring ML tree (model=$MODEL, threads=$THREADS)..."
 
 cd "$ML_DIR"
 
@@ -29,9 +38,8 @@ cd "$ML_DIR"
     --seed 12345 \
     --tree pars{1} \
     --redo \
-    2>&1 | tee raxml-ng_ml.log
+    2>&1 | tee raxml-ng_ml.log >> "$LOG_FILE"
 
-ML_TREE="$ML_DIR/ml_tree.raxml.bestTree"
 [[ ! -f "$ML_TREE" ]] && error "ML tree inference failed: $ML_TREE not found"
 
 log "ML tree: $ML_TREE"

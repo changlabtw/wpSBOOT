@@ -1,0 +1,10 @@
+name: wpsboot
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - t_coffee
+  - raxml-ng
+  - perl-bioperl
+  - python >=3.6

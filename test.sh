@@ -14,6 +14,7 @@
 #   ./test.sh --gene YDR192C --full  # full test,  YDR192C
 #   ./test.sh --gene all             # quick test, both genes
 #   ./test.sh --gene all --full      # full test,  both genes
+#   ./test.sh --features             # feature tests only (flags + input validation)
 #
 
 set -euo pipefail
@@ -28,12 +29,13 @@ usage() {
 wpSBOOT test script
 https://github.com/changlabtw/wpSBOOT
 
-Usage: $(basename "$0") [--gene <name>] [--full] [-h]
+Usage: $(basename "$0") [--gene <name>] [--full] [--features] [-h]
 
 Options:
   --gene <name>   Gene to test: YPL070W (default), YDR192C, or all
   --full          Run with default bootstrap replicates (N x 100)
                   instead of the quick test (10 replicates)
+  --features      Run feature tests only (flags + input validation)
   -h, --help      Show this help and exit
 
 Examples:
@@ -43,6 +45,7 @@ Examples:
   $(basename "$0") --gene YDR192C --full  # full test,  YDR192C
   $(basename "$0") --gene all             # quick test, both genes
   $(basename "$0") --gene all --full      # full test,  both genes
+  $(basename "$0") --features             # feature tests only
 
 Output:
   test_output/<gene>/wpSBOOT_result.nwk  ← ML tree with bootstrap support
@@ -51,6 +54,12 @@ Summary printed after each run:
   - Tree topology (ASCII, if < 20 taxa) and Newick string
   - Per-node bootstrap support (mean, median, min, max, fully supported)
   - Whole-tree topology support (fraction of replicates with identical topology)
+
+Feature tests (--features):
+  - Taxa mismatch detection
+  - Seed reproducibility (-s)
+  - Force flag (-f)
+  - Keep intermediates (-k)
 
 Available genes:
   YPL070W   example/YPL070W/  (7 alignments)
@@ -62,18 +71,24 @@ EOF
 
 # --- Parse arguments ---
 FULL_RUN=0
+FEATURES=0
 GENE="YPL070W"
 while [[ $# -gt 0 ]]; do
     case $1 in
         --full)        FULL_RUN=1 ; shift ;;
+        --features)    FEATURES=1 ; shift ;;
         --gene)        GENE="$2"  ; shift 2 ;;
         -h|--help)     usage ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
 
-# --- Colours ---
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
+# --- Colours (only when stdout is a terminal) ---
+if [[ -t 1 ]]; then
+    RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
+else
+    RED=''; GREEN=''; YELLOW=''; NC=''
+fi
 pass() { echo -e "${GREEN}[PASS]${NC} $*"; }
 fail() { echo -e "${RED}[FAIL]${NC} $*"; FAILURES=$((FAILURES+1)); }
 info() { echo -e "${YELLOW}[INFO]${NC} $*"; }
@@ -117,6 +132,75 @@ if [[ $FAILURES -gt 0 ]]; then
     echo -e "${RED}$FAILURES pre-flight check(s) failed. Please fix before running the pipeline.${NC}"
     exit 1
 fi
+
+# -----------------------------------------------
+# Feature tests: flags and input validation
+# -----------------------------------------------
+run_feature_tests() {
+    local feat_out="$TEST_OUT_ROOT/feature_tests"
+    local aln_dir="$EXAMPLE_DIR/YPL070W"
+    read -ra alns <<< "$(gene_alns YPL070W)"
+    local ALN_ARGS=()
+    for f in "${alns[@]}"; do ALN_ARGS+=("-i" "$aln_dir/$f"); done
+
+    echo ""
+    echo "----------------------------------------"
+    echo " Feature tests"
+    echo "----------------------------------------"
+
+    # --- Taxa mismatch detection ---
+    info "Feature test: taxa mismatch detection..."
+    local tmp_fasta
+    tmp_fasta=$(mktemp /tmp/wpSBOOT_test_XXXXX.fasta)
+    printf '>WrongTaxon1\nACGT\n>WrongTaxon2\nACGT\n' > "$tmp_fasta"
+    local mismatch_out
+    mismatch_out=$(bash "$SCRIPT_DIR/scripts/wpsboot.sh" \
+        -i "$aln_dir/clustalw_YPL070W.fasta" \
+        -i "$tmp_fasta" \
+        -o "$feat_out/taxa_test" 2>&1 || true)
+    rm -f "$tmp_fasta"
+    if echo "$mismatch_out" | grep -q "Taxa mismatch"; then
+        pass "Taxa mismatch: error detected correctly"
+    else
+        fail "Taxa mismatch: error not detected"
+    fi
+
+    # --- Seed reproducibility (-s) ---
+    info "Feature test: seed reproducibility (-s)..."
+    bash "$SCRIPT_DIR/scripts/wpsboot.sh" \
+        "${ALN_ARGS[@]}" -o "$feat_out/seed1" -n 5 -s 42 > /dev/null 2>&1
+    bash "$SCRIPT_DIR/scripts/wpsboot.sh" \
+        "${ALN_ARGS[@]}" -o "$feat_out/seed2" -n 5 -s 42 > /dev/null 2>&1
+    if diff "$feat_out/seed1/03_bootstrap/outfile" \
+            "$feat_out/seed2/03_bootstrap/outfile" > /dev/null 2>&1; then
+        pass "Seed reproducibility: identical bootstrap samples with -s 42"
+    else
+        fail "Seed reproducibility: bootstrap samples differ with same seed"
+    fi
+
+    # --- Force flag (-f) ---
+    info "Feature test: force flag (-f)..."
+    # Rerun seed1/ (already complete) with -f: step 1 must rerun, not skip
+    bash "$SCRIPT_DIR/scripts/wpsboot.sh" \
+        "${ALN_ARGS[@]}" -o "$feat_out/seed1" -n 5 -s 42 -f > /dev/null 2>&1
+    if grep -q "Step 1: Computing" "$feat_out/seed1/wpsboot.log"; then
+        pass "Force flag: step 1 reran on existing output"
+    else
+        fail "Force flag: step 1 did not rerun"
+    fi
+
+    # --- Keep intermediates (-k) ---
+    info "Feature test: keep intermediates (-k)..."
+    bash "$SCRIPT_DIR/scripts/wpsboot.sh" \
+        "${ALN_ARGS[@]}" -o "$feat_out/keep" -n 5 -k > /dev/null 2>&1
+    local n_phy
+    n_phy=$(ls "$feat_out/keep/05_boot_trees/boot_"*.phy 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "$n_phy" -eq 5 ]]; then
+        pass "Keep intermediates: $n_phy per-replicate .phy files retained"
+    else
+        fail "Keep intermediates: expected 5 .phy files, found $n_phy"
+    fi
+}
 
 # -----------------------------------------------
 # Per-gene alignment file definitions
@@ -197,12 +281,18 @@ run_gene() {
     check_file "Bootstrap trees"    "$test_out/05_boot_trees/bootstrap_trees.nwk"
     check_file "Final support tree" "$test_out/wpSBOOT_result.nwk"
 
-    # Bootstrap support summary
-    echo ""
-    info "Bootstrap support summary ($gene)..."
-    python3 "$SCRIPT_DIR/scripts/support_summary.py" \
-        "$test_out/wpSBOOT_result.nwk" \
-        "$test_out/05_boot_trees/bootstrap_trees.nwk"
+    # Sanity check: verify all expected taxa appear in the result tree
+    local expected_taxa="Scer Spar Smik Skud Sbay Scas Sklu"
+    local result_nwk
+    result_nwk=$(cat "$test_out/wpSBOOT_result.nwk")
+    local taxa_ok=1
+    for taxon in $expected_taxa; do
+        if ! echo "$result_nwk" | grep -q "$taxon"; then
+            fail "Result tree missing taxon: $taxon"
+            taxa_ok=0
+        fi
+    done
+    [[ $taxa_ok -eq 1 ]] && pass "Result tree contains all expected taxa"
 }
 
 # -----------------------------------------------
@@ -223,7 +313,14 @@ for g in "${GENES_TO_RUN[@]}"; do
 done
 
 # -----------------------------------------------
-# 3. Final summary
+# 3. Feature tests (flags + input validation)
+# -----------------------------------------------
+if [[ $FEATURES -eq 1 ]]; then
+    run_feature_tests
+fi
+
+# -----------------------------------------------
+# 4. Final summary
 # -----------------------------------------------
 echo ""
 echo "========================================"

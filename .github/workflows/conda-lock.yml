@@ -1,0 +1,41 @@
+name: Update conda lock file
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - environment.yml
+  workflow_dispatch:
+
+jobs:
+  conda-lock:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          activate-environment: base
+
+      - name: Install conda-lock
+        shell: bash -el {0}
+        run: conda install -n base -c conda-forge conda-lock -y
+
+      - name: Generate lock file
+        shell: bash -el {0}
+        run: |
+          conda-lock lock \
+            --file environment.yml \
+            --platform linux-64 \
+            --platform osx-arm64 \
+            --platform osx-64
+
+      - name: Commit updated lock file
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update conda-lock.yml"
+          file_pattern: conda-lock.yml

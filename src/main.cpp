@@ -20,6 +20,8 @@ int replicate_num;
 float sam_pro;
 bool do_shuffle;
 bool random_sample;
+unsigned long seed_val;
+bool use_fixed_seed;
 
 void exit_with_help()
 {
@@ -30,6 +32,7 @@ void exit_with_help()
 		" -r random_sample: randomly sample column or not; 0-NO, 1-YES (def. 1)\n"
 		" -p replicate_proportion: 0~1, set the proportion of the partial sampling (def. 1)\n"
 		" -s shuffle: shuffle the order of sequence or not (def. 0)\n"
+		" -d seed: random seed for reproducibility (def. time-based)\n"
 		"output:\n"
 		" outfile: file contains replicate, naming from phylip\n"
 	);
@@ -44,7 +47,7 @@ int main(int argc, char *argv[])
  	vector<double> prob_vec;
 	
 	cout << "[BEGIN]Local-bootstrap" << endl;
-//INPUT
+	//INPUT
 	parse_command_line(argc, argv, aln_f, poswei_f);
 	//read PHYLIP alignement
 	element_set input_ele(aln_f);
@@ -63,8 +66,12 @@ int main(int argc, char *argv[])
 	int size = (int)round(input_ele.get_len()*sam_pro);
 	cout << " Bootstrap:"<<  endl
 	     << "\treplicate's number = " << replicate_num << endl
-	     << "\treplicate's size   = " << size << endl
-	     << " Outfile = outfile "     << endl;
+	     << "\treplicate's size   = " << size << endl;
+	if(use_fixed_seed)
+	     cout << "\trandom seed        = " << seed_val << endl;
+	else
+	     cout << "\trandom seed        = time-based (not fixed)" << endl;
+	cout << " Outfile = outfile "     << endl;
 	     
 	vector<int> pos_vec;
 	for(i = 0; i < replicate_num; i++)
@@ -90,7 +97,9 @@ void parse_command_line(int argc, char **argv, char *aln_f, char *poswei_f)
 	replicate_num = 100;
 	do_shuffle = false;
 	random_sample = true;
-	
+	seed_val = 0;
+	use_fixed_seed = false;
+
 	// parse options
 	for(i=1;i<argc;i++)
 	{
@@ -104,12 +113,16 @@ void parse_command_line(int argc, char **argv, char *aln_f, char *poswei_f)
 				break;
 			case 'r':
 				random_sample = (atoi(argv[i]) == 1);
-				break;	
+				break;
 			case 'p':
 				sam_pro = atof(argv[i]);
 				break;
 			case 's':
 				do_shuffle = (atoi(argv[i]) == 1);
+				break;
+			case 'd':
+				seed_val = (unsigned long)atol(argv[i]);
+				use_fixed_seed = true;
 				break;
 			default:
 				fprintf(stderr,"unknown option\n");
@@ -153,7 +166,7 @@ void read_posWei(char *poswei_f, vector<double> &prob_vec)
 void get_rand_by_wei(vector<double> probabilities, int size, int limit, vector<int> &pos_vec)
 {
 	int int_tmp;
-	static mt19937 rng(static_cast<unsigned> (time(0)));
+	static mt19937 rng(use_fixed_seed ? seed_val : static_cast<unsigned>(time(0)));
 
 	// sample from the distribution
 	discrete_distribution<> dist(probabilities.begin(), probabilities.end());

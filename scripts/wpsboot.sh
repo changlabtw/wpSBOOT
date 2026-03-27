@@ -23,13 +23,17 @@ set -euo pipefail
 # Locate script and bin directories relative to this file
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_DIR="$(cd "$SCRIPT_DIR/../bin" && pwd)"
+VERSION="$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "unknown")"
 
 # --- Default parameters ---
-MODEL="GTR+G"        # substitution model for raxml-ng
-THREADS=4            # parallel threads
-BOOTSTRAP_REPS=""    # number of bootstrap replicates; default: N_alignments x 100
-PARTIAL_FRACTION=""  # partial sampling fraction; default: 1/N_alignments
-INPUT_FILES=()       # input alignment files (FASTA), collected via -i
+MODEL="GTR+G"          # substitution model for raxml-ng
+THREADS=4              # parallel threads
+BOOTSTRAP_REPS=""      # number of bootstrap replicates; default: N_alignments x 100
+PARTIAL_FRACTION=""    # partial sampling fraction; default: 1/N_alignments
+SEED=""                # random seed for wei_seqboot; default: time-based
+FORCE=0                # skip existing outputs (0) or rerun all steps (1)
+KEEP_INTERMEDIATES=0   # delete per-replicate bootstrap files after step 5 (0) or keep (1)
+INPUT_FILES=()         # input alignment files (FASTA), collected via -i
 
 usage() {
     cat << EOF
@@ -47,6 +51,10 @@ Options:
   -p <float>   Partial sampling fraction 0.0-1.0 (default: 1/N)
   -m <model>   Substitution model for raxml-ng (default: GTR+G)
   -T <int>     Threads (default: 4)
+  -s <int>     Random seed for bootstrap sampling (default: time-based, not reproducible)
+  -f           Force rerun of all steps, ignoring any existing outputs
+  -k           Keep intermediate per-replicate bootstrap files (default: deleted after step 5)
+  -v           Print version and exit
   -h           Show this help and exit
 
 Pipeline steps and output folders:
@@ -59,22 +67,24 @@ Pipeline steps and output folders:
 
 Final result:
   <output_dir>/wpSBOOT_result.nwk   ML tree with bootstrap support values
+  <output_dir>/wpsboot.log          Full pipeline log
 
 Examples:
   $(basename "$0") -i clustalw.fasta -i mafft.fasta -i muscle.fasta -o results/
   $(basename "$0") -i example/YPL070W/*.fasta -o results/YPL070W -n 1000 -T 8
+  $(basename "$0") -i aln1.fasta -i aln2.fasta -o results/ -f    # force full rerun
 
 EOF
     exit 0
 }
 
-# Logging helpers; exported so sourced step scripts can use them
+# Initial logging helpers (before log file is known; write to stdout only)
 log()   { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 error() { echo "[ERROR] $*" >&2; exit 1; }
 export -f log error
 
 # --- Parse command-line arguments ---
-while getopts "i:o:n:p:m:T:h" opt; do
+while getopts "i:o:n:p:m:T:s:fkvh" opt; do
     case $opt in
         i) INPUT_FILES+=("$OPTARG") ;;   # accumulate input files
         o) OUTPUT_DIR="$OPTARG" ;;
@@ -82,6 +92,10 @@ while getopts "i:o:n:p:m:T:h" opt; do
         p) PARTIAL_FRACTION="$OPTARG" ;;
         m) MODEL="$OPTARG" ;;
         T) THREADS="$OPTARG" ;;
+        s) SEED="$OPTARG" ;;
+        f) FORCE=1 ;;
+        k) KEEP_INTERMEDIATES=1 ;;
+        v) echo "wpSBOOT $VERSION"; exit 0 ;;
         h) usage ;;
         *) usage ;;
     esac
@@ -112,20 +126,45 @@ N=${#INPUT_FILES[@]}
 # Default partial fraction: 1/N (each bootstrap sample covers ~one alignment's worth of sites)
 [[ -z "$PARTIAL_FRACTION" ]] && PARTIAL_FRACTION=$(awk "BEGIN {printf \"%.6f\", 1/$N}")
 
-mkdir -p "$OUTPUT_DIR"
+# --- Set up log file (start fresh each run) ---
+LOG_FILE="$OUTPUT_DIR/wpsboot.log"
+> "$LOG_FILE"
+export LOG_FILE
+
+# Redefine logging helpers with file output now that LOG_FILE is known:
+#   log()        -> log file only (detailed pipeline output)
+#   log_stdout() -> stdout + log file (key milestones shown to user)
+#   error()      -> stderr + log file, then exit
+log()        { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"; }
+log_stdout() { local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $*"; echo "$msg"; echo "$msg" >> "$LOG_FILE"; }
+error()      { local msg="[ERROR] $*"; echo "$msg" >&2; echo "$msg" >> "$LOG_FILE"; exit 1; }
+export -f log log_stdout error
 
 # --- Print run summary ---
-log "=== wpSBOOT ==="
-log "Input alignments : $N"
+log_stdout "=== wpSBOOT ==="
+log_stdout "Input alignments : $N"
 for f in "${INPUT_FILES[@]}"; do log "  $(basename "$f")"; done
-log "Bootstrap reps   : $BOOTSTRAP_REPS"
-log "Partial fraction : $PARTIAL_FRACTION  (default: 1/N = 1/$N)"
-log "Model            : $MODEL"
-log "Threads          : $THREADS"
-log "Output           : $OUTPUT_DIR"
+log_stdout "Bootstrap reps   : $BOOTSTRAP_REPS"
+log_stdout "Partial fraction : $PARTIAL_FRACTION  (default: 1/N = 1/$N)"
+log_stdout "Seed             : ${SEED:-time-based (not reproducible)}"
+log_stdout "Model            : $MODEL"
+log_stdout "Threads          : $THREADS"
+log_stdout "Output           : $OUTPUT_DIR"
+log_stdout "Log              : $LOG_FILE"
+
+# --- Validate taxa consistency across all input alignments ---
+get_taxa() { grep '^>' "$1" | awk '{print $1}' | sed 's/^>//' | sort; }
+ref_taxa=$(get_taxa "${INPUT_FILES[0]}")
+for f in "${INPUT_FILES[@]:1}"; do
+    file_taxa=$(get_taxa "$f")
+    if [[ "$ref_taxa" != "$file_taxa" ]]; then
+        error "Taxa mismatch: $(basename "$f") has different sequence IDs than $(basename "${INPUT_FILES[0]}")"
+    fi
+done
+log "Input taxa validated ($(echo "$ref_taxa" | wc -w | tr -d ' ') taxa consistent across all alignments)"
 
 # Export shared variables for use by all sourced step scripts
-export BIN_DIR MODEL THREADS BOOTSTRAP_REPS PARTIAL_FRACTION N OUTPUT_DIR SCRIPT_DIR
+export BIN_DIR MODEL THREADS BOOTSTRAP_REPS PARTIAL_FRACTION SEED FORCE KEEP_INTERMEDIATES N OUTPUT_DIR SCRIPT_DIR
 
 # --- Execute pipeline steps ---
 # Each step script is sourced so it inherits all variables (INPUT_FILES array,
@@ -143,5 +182,10 @@ ELAPSED=$(( TIME_END - TIME_START ))
 ELAPSED_MIN=$(( ELAPSED / 60 ))
 ELAPSED_SEC=$(( ELAPSED % 60 ))
 
-log "=== Done. Final result: $OUTPUT_DIR/wpSBOOT_result.nwk ==="
-log "=== Total runtime: ${ELAPSED_MIN}m ${ELAPSED_SEC}s ==="
+log_stdout "=== Done. Final result: $OUTPUT_DIR/wpSBOOT_result.nwk ==="
+log_stdout "=== Total runtime: ${ELAPSED_MIN}m ${ELAPSED_SEC}s ==="
+
+# --- Bootstrap support summary ---
+python3 "$SCRIPT_DIR/support_summary.py" \
+    "$OUTPUT_DIR/wpSBOOT_result.nwk" \
+    "$OUTPUT_DIR/05_boot_trees/bootstrap_trees.nwk" | tee -a "$LOG_FILE"

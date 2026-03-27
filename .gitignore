@@ -8,12 +8,15 @@ bin/wei_seqboot
 # Keep the bin/ directory in the repo
 !bin/.gitkeep
 
-# Compiled object files
+# Compiled object files and binaries
 src/*.o
 
 # Pipeline output directories
 results/
 test_output/
+
+# Log files (includes wpsboot.log written to output directories)
+*.log
 
 # macOS
 .DS_Store

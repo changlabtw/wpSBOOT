@@ -12,7 +12,7 @@ OBJECT		=  $(SOURCE:%.cpp=%.o)
 
 wei_seqboot:	$(OBJECT)
 			$(Compiler) $(FLAGS) $(OBJECT) -o wei_seqboot $(LIB)
-			mv -f wei_seqboot ../.
+			mv -f wei_seqboot ../bin/.
 			
 %.o:		%.cpp
 			$(Compiler) $(FLAGS) -c $< -o $@

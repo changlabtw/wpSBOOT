@@ -18,6 +18,18 @@ wpSBOOT (Weighted Partial Super Bootstrap) is a bioinformatics protocol for phyl
 # Run with custom partial fraction and model
 ./scripts/wpsboot.sh -i aln1.fasta -i aln2.fasta -o output_dir/ -p 0.5 -m GTR+G
 
+# Run with fixed random seed for reproducibility
+./scripts/wpsboot.sh -i aln1.fasta -i aln2.fasta -o output_dir/ -s 42
+
+# Force full rerun (ignore existing outputs)
+./scripts/wpsboot.sh -i aln1.fasta -i aln2.fasta -o output_dir/ -f
+
+# Keep intermediate per-replicate bootstrap files
+./scripts/wpsboot.sh -i aln1.fasta -i aln2.fasta -o output_dir/ -k
+
+# Print version
+./scripts/wpsboot.sh -v
+
 # Quick test (10 replicates) — YPL070W by default
 ./test.sh
 
@@ -27,6 +39,9 @@ wpSBOOT (Weighted Partial Super Bootstrap) is a bioinformatics protocol for phyl
 # Test a specific gene or both genes
 ./test.sh --gene YDR192C
 ./test.sh --gene all --full
+
+# Feature tests only (flags + input validation)
+./test.sh --features
 
 # Bootstrap support summary (per-node + tree topology)
 python3 scripts/support_summary.py <output_dir>/wpSBOOT_result.nwk
@@ -95,9 +110,23 @@ wpSBOOT/
 │   ├── YPL070W/          ← 7 FASTA alignments for YPL070W
 │   └── YDR192C/          ← 7 FASTA alignments for YDR192C
 ├── web/                  ← Flask web server (separate from CLI pipeline)
-├── test.sh               ← user-facing test script (supports --gene, --full)
+├── test.sh               ← user-facing test script (supports --gene, --full, --features)
+├── setup.sh              ← installation helper (compiles wei_seqboot, symlinks tools)
+├── Dockerfile            ← Docker image definition
+├── environment.yml       ← conda environment specification
+├── VERSION               ← version string (read by wpsboot.sh -v)
 └── README.md
 ```
+
+## Resume / skip completed steps
+
+Each step script checks whether its key output file already exists. If it does, the step is skipped and its output variables are restored from the existing files. This means re-running `wpsboot.sh` on an existing output directory resumes from wherever it left off — useful after interrupted runs or when only later steps need to be rerun.
+
+To force a full rerun, use the `-f` flag or delete the output directory (or a specific step subdirectory) before running.
+
+## Bootstrap support summary
+
+`wpsboot.sh` automatically runs `support_summary.py` at the end of every pipeline run, printing tree topology and per-node + whole-tree bootstrap statistics. The summary can also be run manually:
 
 ## support_summary.py
 
@@ -129,6 +158,7 @@ All variables are set in `wpsboot.sh` and inherited by sourced step scripts:
 | `OUTPUT_DIR` | Output directory path | required |
 | `BOOTSTRAP_REPS` | Number of bootstrap replicates | N × 100 |
 | `PARTIAL_FRACTION` | Fraction of super-MSA sites per replicate | 1/N |
+| `SEED` | Random seed for wei_seqboot (-d flag) | time-based |
 | `MODEL` | RAxML-NG substitution model | GTR+G |
 | `THREADS` | Parallel threads | 4 |
 | `BIN_DIR` | Path to executables | `../bin/` |
@@ -150,9 +180,14 @@ Step scripts export these variables for downstream steps:
 - **Perl + BioPerl** — required by `concatenate.pl` (`Bio::AlignIO`, `Bio::Align::Utilities`, `Bio::LocatableSeq`)
 - **wei_seqboot** — compiled from `src/` using `make`
 
-## Reference Data for Validation
+## Validation
 
-Pre-computed reference outputs for YPL070W (7 alignments) are in `202603_originalCode/pre_results/`:
-- `concatenateAln_YPL070W.phylip` — expected super-MSA
-- `YPL070W.wei` — expected site weights
-- `YPL070W.tre` — reference ML tree
+Use `./test.sh` to validate the installation. It runs the full pipeline on both example gene families (YPL070W, YDR192C). Feature tests (input validation, seed reproducibility, force flag, keep intermediates) are run separately with `--features`.
+
+## Docker
+
+A `Dockerfile` is included. The CI workflow `.github/workflows/docker.yml` auto-builds and pushes a multi-platform image (`linux/amd64`, `linux/arm64`) to Docker Hub (`changlabtw/wpsboot`) on each GitHub Release. Requires `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets set in the GitHub repo settings.
+
+## Versioning
+
+The version string is stored in `VERSION` at the repo root. `wpsboot.sh -v` reads and prints it. Update `VERSION` before each release.
