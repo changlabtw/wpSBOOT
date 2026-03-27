@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/changlabtw/wpSBOOT/actions/workflows/test.yml/badge.svg)](https://github.com/changlabtw/wpSBOOT/actions/workflows/test.yml)
-[![Docker](https://img.shields.io/docker/v/changlabtw/wpsboot?label=Docker&logo=docker)](https://hub.docker.com/r/changlabtw/wpsboot)
+[![Docker](https://img.shields.io/badge/Docker-changlabtw%2Fwpsboot-blue?logo=docker)](https://hub.docker.com/r/changlabtw/wpsboot)
 
 A phylogenetic support assessment protocol that takes multiple sequence alignments (produced by different alignment tools) as input, builds a weighted super-MSA, and generates bootstrap support values using weighted partial resampling.
 
