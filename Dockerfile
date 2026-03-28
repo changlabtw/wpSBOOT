@@ -1,4 +1,6 @@
-FROM continuumio/miniconda3:latest
+FROM mambaorg/micromamba:latest
+
+USER root
 
 # Install C++ build tools for compiling wei_seqboot
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -11,9 +13,10 @@ WORKDIR /opt/wpsboot
 COPY . .
 
 # Install pipeline dependencies (t_coffee, raxml-ng, perl-bioperl, python)
-RUN conda install -n base -c conda-forge mamba -y \
-    && mamba env update -n base --file environment.yml \
-    && conda clean -afy
+RUN micromamba install -n base -y \
+        -c conda-forge -c bioconda \
+        t_coffee raxml-ng perl-bioperl "python>=3.6" \
+    && micromamba clean -afy
 
 # Compile wei_seqboot from source; output goes to bin/ via makefile
 RUN cd src && make && cd ..
