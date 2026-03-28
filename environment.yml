@@ -1,7 +1,7 @@
 name: wpsboot
 channels:
-  - bioconda
   - conda-forge
+  - bioconda
   - defaults
 dependencies:
   - t_coffee

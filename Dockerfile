@@ -11,7 +11,8 @@ WORKDIR /opt/wpsboot
 COPY . .
 
 # Install pipeline dependencies (t_coffee, raxml-ng, perl-bioperl, python)
-RUN conda env update -n base --file environment.yml \
+RUN conda install -n base -c conda-forge mamba -y \
+    && mamba env update -n base --file environment.yml \
     && conda clean -afy
 
 # Compile wei_seqboot from source; output goes to bin/ via makefile
