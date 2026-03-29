@@ -13,7 +13,7 @@ A phylogenetic support assessment protocol that takes multiple sequence alignmen
 Different alignment tools (ClustalW, MAFFT, Muscle, etc.) produce different alignments from the same input sequences, each with its own biases and uncertainties. wpSBOOT exploits this diversity by:
 
 1. **Weighting** each alignment by how much it disagrees with the others — alignments with less inter-aligner agreement carry more unique signal and receive higher weight
-2. **Concatenating** all alignments into a single weighted super-MSA
+2. **Concatenating** all alignments into a single super-MSA
 3. **Bootstrapping** with weighted partial resampling — each replicate draws a fraction (1/N) of sites preferentially from high-weight alignments
 4. **Inferring** ML and bootstrap trees, then mapping support values
 
