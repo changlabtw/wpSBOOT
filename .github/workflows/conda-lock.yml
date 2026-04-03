@@ -35,7 +35,7 @@ jobs:
             --platform osx-64
 
       - name: Commit updated lock file
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "chore: update conda-lock.yml"
           file_pattern: conda-lock.yml
