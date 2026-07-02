@@ -110,7 +110,6 @@ wpSBOOT/
 │   └── nucleotide/
 │       ├── YPL070W/      ← 7 FASTA alignments for YPL070W
 │       └── YDR192C/      ← 7 FASTA alignments for YDR192C
-├── web/                  ← Flask web server (separate from CLI pipeline)
 ├── test.sh               ← user-facing test script (supports --gene, --full, --features)
 ├── setup.sh              ← installation helper (compiles wei_seqboot, symlinks tools)
 ├── Dockerfile            ← Docker image definition

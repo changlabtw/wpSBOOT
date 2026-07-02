@@ -22,6 +22,9 @@ example/protein/
 run4MiBB_protein.sh
 res4MiMB/
 
+# Flask web server (kept local; not published)
+web/
+
 # Log files (includes wpsboot.log written to output directories)
 *.log
 
