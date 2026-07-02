@@ -49,7 +49,8 @@ Required:
 Options:
   -n <int>     Bootstrap replicates (default: N x 100, where N = number of alignments)
   -p <float>   Partial sampling fraction 0.0-1.0 (default: 1/N)
-  -m <model>   Substitution model for raxml-ng (default: GTR+G)
+  -m <model>   Substitution model for raxml-ng (default: GTR+G for nucleotide;
+               use e.g. LG+G for protein sequences)
   -T <int>     Threads (default: 4)
   -s <int>     Random seed for bootstrap sampling (default: time-based, not reproducible)
   -f           Force rerun of all steps, ignoring any existing outputs

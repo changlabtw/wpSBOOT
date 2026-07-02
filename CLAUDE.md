@@ -38,7 +38,7 @@ wpSBOOT (Weighted Partial Super Bootstrap) is a bioinformatics protocol for phyl
 
 # Test a specific gene or both genes
 ./test.sh --gene YDR192C
-./test.sh --gene all --full
+./test.sh --gene all_nucleic --full
 
 # Feature tests only (flags + input validation)
 ./test.sh --features
@@ -107,8 +107,9 @@ wpSBOOT/
 │   └── support_summary.py ← bootstrap support summary (per-node + whole-tree)
 ├── src/                  ← wei_seqboot C++ source (main.cpp, element.cpp, makefile)
 ├── example/
-│   ├── YPL070W/          ← 7 FASTA alignments for YPL070W
-│   └── YDR192C/          ← 7 FASTA alignments for YDR192C
+│   └── nucleotide/
+│       ├── YPL070W/      ← 7 FASTA alignments for YPL070W
+│       └── YDR192C/      ← 7 FASTA alignments for YDR192C
 ├── web/                  ← Flask web server (separate from CLI pipeline)
 ├── test.sh               ← user-facing test script (supports --gene, --full, --features)
 ├── setup.sh              ← installation helper (compiles wei_seqboot, symlinks tools)
@@ -159,7 +160,7 @@ All variables are set in `wpsboot.sh` and inherited by sourced step scripts:
 | `BOOTSTRAP_REPS` | Number of bootstrap replicates | N × 100 |
 | `PARTIAL_FRACTION` | Fraction of super-MSA sites per replicate | 1/N |
 | `SEED` | Random seed for wei_seqboot (-d flag) | time-based |
-| `MODEL` | RAxML-NG substitution model | GTR+G |
+| `MODEL` | RAxML-NG substitution model | GTR+G (nucleotide); use e.g. LG+G for protein |
 | `THREADS` | Parallel threads | 4 |
 | `BIN_DIR` | Path to executables | `../bin/` |
 

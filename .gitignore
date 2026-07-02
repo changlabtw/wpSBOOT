@@ -15,6 +15,13 @@ src/*.o
 results/
 test_output/
 
+# Protein example alignments (local use only, not published)
+example/protein/
+
+# Local-only run scripts and result directories (not published)
+run4MiBB_protein.sh
+res4MiMB/
+
 # Log files (includes wpsboot.log written to output directories)
 *.log
 

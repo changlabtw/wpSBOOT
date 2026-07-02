@@ -1,6 +1,7 @@
 .git/
 test_output/
 results/
+web/
 *.log
 bin/t_coffee
 bin/raxml-ng

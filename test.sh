@@ -12,8 +12,8 @@
 #   ./test.sh --full                 # full test,  YPL070W
 #   ./test.sh --gene YDR192C         # quick test, YDR192C
 #   ./test.sh --gene YDR192C --full  # full test,  YDR192C
-#   ./test.sh --gene all             # quick test, both genes
-#   ./test.sh --gene all --full      # full test,  both genes
+#   ./test.sh --gene all_nucleic     # quick test, both genes
+#   ./test.sh --gene all_nucleic --full  # full test, both genes
 #   ./test.sh --features             # feature tests only (flags + input validation)
 #
 
@@ -21,7 +21,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_DIR="$SCRIPT_DIR/bin"
-EXAMPLE_DIR="$SCRIPT_DIR/example"
+EXAMPLE_NT_DIR="$SCRIPT_DIR/example/nucleotide"
 TEST_OUT_ROOT="$SCRIPT_DIR/test_output"
 
 usage() {
@@ -32,7 +32,7 @@ https://github.com/changlabtw/wpSBOOT
 Usage: $(basename "$0") [--gene <name>] [--full] [--features] [-h]
 
 Options:
-  --gene <name>   Gene to test: YPL070W (default), YDR192C, or all
+  --gene <name>   Gene to test: YPL070W (default), YDR192C, all_nucleic
   --full          Run with default bootstrap replicates (N x 100)
                   instead of the quick test (10 replicates)
   --features      Run feature tests only (flags + input validation)
@@ -43,8 +43,8 @@ Examples:
   $(basename "$0") --full                 # full test,  YPL070W
   $(basename "$0") --gene YDR192C         # quick test, YDR192C
   $(basename "$0") --gene YDR192C --full  # full test,  YDR192C
-  $(basename "$0") --gene all             # quick test, both genes
-  $(basename "$0") --gene all --full      # full test,  both genes
+  $(basename "$0") --gene all_nucleic     # quick test, both genes
+  $(basename "$0") --gene all_nucleic --full  # full test, both genes
   $(basename "$0") --features             # feature tests only
 
 Output:
@@ -62,8 +62,8 @@ Feature tests (--features):
   - Keep intermediates (-k)
 
 Available genes:
-  YPL070W   example/YPL070W/  (7 alignments)
-  YDR192C   example/YDR192C/  (7 alignments)
+  YPL070W   example/nucleotide/YPL070W/  (7 alignments)
+  YDR192C   example/nucleotide/YDR192C/  (7 alignments)
 
 EOF
     exit 0
@@ -138,7 +138,7 @@ fi
 # -----------------------------------------------
 run_feature_tests() {
     local feat_out="$TEST_OUT_ROOT/feature_tests"
-    local aln_dir="$EXAMPLE_DIR/YPL070W"
+    local aln_dir="$EXAMPLE_NT_DIR/YPL070W"
     read -ra alns <<< "$(gene_alns YPL070W)"
     local ALN_ARGS=()
     for f in "${alns[@]}"; do ALN_ARGS+=("-i" "$aln_dir/$f"); done
@@ -155,7 +155,7 @@ run_feature_tests() {
     printf '>WrongTaxon1\nACGT\n>WrongTaxon2\nACGT\n' > "$tmp_fasta"
     local mismatch_out
     mismatch_out=$(bash "$SCRIPT_DIR/scripts/wpsboot.sh" \
-        -i "$aln_dir/clustalw_YPL070W.fasta" \
+        -i "$aln_dir/clustalw.fasta" \
         -i "$tmp_fasta" \
         -o "$feat_out/taxa_test" 2>&1 || true)
     rm -f "$tmp_fasta"
@@ -206,10 +206,8 @@ run_feature_tests() {
 # Per-gene alignment file definitions
 # -----------------------------------------------
 gene_alns() {
-    # Print space-separated list of alignment filenames for a given gene
     case $1 in
-        YPL070W) echo "clustalw_YPL070W.fasta DCA_YPL070W.fasta dialign_YPL070W.fasta mafft_YPL070W.fasta muscle_YPL070W.fasta probcons_YPL070W.fasta tcoffee_YPL070W.fasta" ;;
-        YDR192C) echo "clustalw_YDR192C.fasta DCR_YDR192C.fasta dialign_YDR192C.fasta mafft_YDR192C.fasta muscle_YDR192C.fasta probcons_YDR192C.fasta tcoffee_YDR192C.fasta" ;;
+        YPL070W|YDR192C) echo "clustalw.fasta DCA.fasta dialign.fasta mafft.fasta muscle.fasta probcons.fasta tcoffee.fasta" ;;
         *) echo "" ;;
     esac
 }
@@ -219,7 +217,7 @@ gene_alns() {
 # -----------------------------------------------
 run_gene() {
     local gene=$1
-    local aln_dir="$EXAMPLE_DIR/$gene"
+    local aln_dir="$EXAMPLE_NT_DIR/$gene"
     local test_out="$TEST_OUT_ROOT/$gene"
     read -ra alns <<< "$(gene_alns "$gene")"
 
@@ -298,15 +296,16 @@ run_gene() {
 # -----------------------------------------------
 # 2. Run selected gene(s)
 # -----------------------------------------------
-if [[ "$GENE" == "all" ]]; then
-    GENES_TO_RUN=("YPL070W" "YDR192C")
-else
-    if [[ -z "$(gene_alns "$GENE")" ]]; then
-        echo -e "${RED}Unknown gene: $GENE. Available: YPL070W, YDR192C, all${NC}"
-        exit 1
-    fi
-    GENES_TO_RUN=("$GENE")
-fi
+case "$GENE" in
+    all_nucleic) GENES_TO_RUN=("YPL070W" "YDR192C") ;;
+    *)
+        if [[ -z "$(gene_alns "$GENE")" ]]; then
+            echo -e "${RED}Unknown gene: $GENE. Available: YPL070W, YDR192C, all_nucleic${NC}"
+            exit 1
+        fi
+        GENES_TO_RUN=("$GENE")
+        ;;
+esac
 
 for g in "${GENES_TO_RUN[@]}"; do
     run_gene "$g"
